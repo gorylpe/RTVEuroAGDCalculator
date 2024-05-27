@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Globalization;
+using System.Text;
 
 internal class Program
 {
@@ -25,6 +26,24 @@ internal class Program
             new("Mikrofala", 2290),
             // new("Telewizor", 8000),
         };
+        
+        var promotionsWithTotalPrice = GetBestSortedPromotions(products, promotions);
+        
+        Console.WriteLine($"Total permutations {promotionsWithTotalPrice.Count}");
+        foreach (var p in promotionsWithTotalPrice)
+        {
+            Console.WriteLine($"Permutation [{string.Join(",", p.Item1.Select(x => x.GroupSize))}], total price - {p.Item3:0.##}");
+            var formattedPrices = string.Join(" ", p.Item2.Select(np => $"[{string.Join("; ", np.Select(x => x.ToString("0.##")))}]"));
+            Console.WriteLine($"{formattedPrices}");
+            Console.WriteLine();
+        }
+    }
+
+    private static List<(List<Promotion>, List<List<double>>, double)> GetBestSortedPromotions(List<Product> products, List<Promotion> promotions)
+    {
+        // Clone array products and promotions
+        products = new List<Product>(products);
+        promotions = new List<Promotion>(promotions);
         products.Sort((x, y) => x.Price.CompareTo(y.Price));
 
         var combinations = new List<PromotionCombination>();
@@ -35,38 +54,32 @@ internal class Program
         // Check first for biggest promotions
         combinations.Reverse();
 
-        var promotionsWithTotalPrice = new List<(List<Promotion>, List<IEnumerable<double>>, double)>();
+        var promotionsWithTotalPrice = new List<(List<Promotion>, List<List<double>>, double)>();
 
         foreach (var c in combinations)
         {
             var promotionsPermutations = PermuteWithoutRepetitions(c.Promotions);
-            foreach (var pp in promotionsPermutations)
+            foreach (var promotionPermutation in promotionsPermutations)
             {
                 var productsTaken = 0;
-                var newPricesList = new List<IEnumerable<double>>();
+                var newPricesList = new List<List<double>>();
                 var totalPrice = 0.0;
-                foreach (var promotion in pp)
+                foreach (var promotion in promotionPermutation)
                 {
                     var productsGroup = products.Skip(productsTaken).Take(promotion.GroupSize);
                     productsTaken += promotion.GroupSize;
-                    var newPrices = promotion.CalculateForAscendingPrices(productsGroup);
+                    var newPrices = promotion.CalculateForAscendingPrices(productsGroup).ToList();
                     newPricesList.Add(newPrices);
                     totalPrice += newPrices.Sum();
                 }
-                promotionsWithTotalPrice.Add((pp, newPricesList, totalPrice));
+                promotionsWithTotalPrice.Add((promotionPermutation, newPricesList, totalPrice));
             }
         }
 
         Console.WriteLine(string.Join(" ", products.Select(x => x.Name.PadRight(10))));
-        Console.WriteLine(string.Join(" ", products.Select(x => x.Price.ToString().PadRight(10))));
+        Console.WriteLine(string.Join(" ", products.Select(x => x.Price.ToString(CultureInfo.InvariantCulture).PadRight(10))));
         promotionsWithTotalPrice.Sort((x, y) => x.Item3.CompareTo(y.Item3));
-        foreach (var p in promotionsWithTotalPrice)
-        {
-            Console.WriteLine($"Permutation [{string.Join(",", p.Item1.Select(x => x.GroupSize))}], total price - {p.Item3:0.##}");
-            var formattedPrices = string.Join(" ", p.Item2.Select(np => $"[{string.Join("; ", np.Select(x => x.ToString("0.##")))}]"));
-            Console.WriteLine($"{formattedPrices}");
-            Console.WriteLine();
-        }
+        return promotionsWithTotalPrice;
     }
 
     private static void FindAllSortedCombinations(ref List<PromotionCombination> combinations, List<Promotion> promotions, int products)
@@ -77,7 +90,7 @@ internal class Program
 
     private static void FindAllSortedCombinationsInternal(ref List<PromotionCombination> combinations, List<Promotion> promotions, int products, ref PromotionCombination c, int minPromotionIndex)
     {
-        for (int i = minPromotionIndex; i < promotions.Count; i++)
+        for (var i = minPromotionIndex; i < promotions.Count; i++)
         {
             try
             {
